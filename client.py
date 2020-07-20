@@ -1,39 +1,53 @@
 import argparse
 import time
 
-DEVICE_FILE = '/dev/pid_tracker'
-
-
-parser = argparse.ArgumentParser(description='TID/PID PCB tracker')
-parser.add_argument('--pid', default=-1, type=int, help='process ID')
-parser.add_argument('--tid', default=-1, type=int, help='thread ID')
-parser.add_argument('--period', default=1, type=int,
-                    help='interval period in seconds')
+FILE_FLAG = '1'
+USER_FLAG = '0'
+DEVICE_FILE = '/dev/phase2'
+parser = argparse.ArgumentParser(description='Phase2')
+parser.add_argument('--devfile', default=DEVICE_FILE,
+                    type=str, help='driver path')
 args = parser.parse_args()
 
-pid = args.pid if args.tid == -1 else args.tid
-with open(DEVICE_FILE, 'w') as f:
-    f.write(str(pid))
+
+
+def add_entery(flag):
+    def wrapper():
+        global args, FILE_FLAG
+        path = input('\tenter file path: ' if flag == FILE_FLAG else '\tenter user id: ')
+        res = int(input('\tenter security level (0-3): '))
+        if not 0 <= res <= 3:
+            print('invalid security level')
+            return
+        with open(args.devfile, 'w') as f:
+            f.write(f'{flag}{res}{path}\n')
+    return wrapper
+
+def print_list():
+    result = None
+    with open(args.devfile, 'r', errors='ignore') as f:
+        result = f.readline()
+    names = result[:len(result)-1].split(':')
+    if names and names[0] != 'users':
+        print('- files: ')
+    for name in names:
+        if name:
+            if name == 'users':
+                print('- users: ')
+                continue
+            print(f'\t* {name[1:]} - {name[0]}')
+
+commands = {
+    'exit': lambda: exit(),
+    'file': add_entery(FILE_FLAG),
+    'user': add_entery(USER_FLAG),
+    'list': print_list,
+}
+
 
 while True:
-    with open(DEVICE_FILE, 'r', errors='ignore') as f:
-        fields = f.readline().split('\t')
-        if len(fields) < 5:
-            print(
-                "Could not find {} - {}".format('process' if args.tid == -1 else 'thread', pid))
-            exit(0)
-
-    pid, tgid, state, nvcsw, nivcsw = fields[:5]
-    if pid != tgid:
-        print(f'Thread {pid} - Process {tgid}:')
-    else:
-        print(f'Process {pid}:')
-    print('\t* State:', state)
-    print('\t* Number of Voluntary Context Switches:', nvcsw)
-    print('\t* Number of Involuntary Context Switches:', nivcsw)
-    print(f'\t* Open Files ({len(fields) - 5}):')
-    for item in fields[5:]:
-        fd, path = item.split(',')
-        print(f'\t\t+ fd: {fd} - File: {path}')
-
-    time.sleep(args.period)
+    cmd = input('enter command (user/file/list/exit): ')
+    for key, f in commands.items():
+        if key == cmd:
+            f()
+            break

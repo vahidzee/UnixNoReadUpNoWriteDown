@@ -1,14 +1,14 @@
-obj-m += pid_tracker.o
+obj-m += phase2.o
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 
 test:
-	-sudo rmmod pid_tracker
-	-sudo rm /dev/pid_tracker
+	-sudo rmmod phase2
+	-sudo rm /dev/phase2
 	sudo dmesg -C
-	sudo insmod pid_tracker.ko
+	sudo insmod phase2.ko
 	dmesg
 	sudo su
 
