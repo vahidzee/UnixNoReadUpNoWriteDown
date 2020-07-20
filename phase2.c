@@ -7,21 +7,28 @@
 #include <linux/uaccess.h>
 #include <linux/rcupdate.h>
 #include <linux/fdtable.h>
-#include <linux/fs.h>
 #include <linux/fs_struct.h>
 #include <linux/time.h>
 #include <linux/cred.h>
 #include <linux/string.h>
 #include <linux/kallsyms.h>
+#include <linux/syscalls.h>
+#include <linux/file.h>
+#include <linux/fcntl.h>
+#include <asm/uaccess.h>
+#include <asm/segment.h>
+#include <linux/buffer_head.h>
+#include <linux/ktime.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vahid Zee");
 MODULE_DESCRIPTION("Open Functionality revised");
 MODULE_VERSION("1.0");
 #define DEVICE_NAME "phase2"
-
+#define LOG_FILE "/tmp/phase2log"
 #define MAX_PATH_LEN 300
 #define MAX_UID_LEN 20
+#define LOG_LEN 500
 #define USER_FLAG '0'
 #define FILE_FLAG '1'
 #define MAJOR_NUMBER 0 // if set to zero will be dynamically allocated
@@ -222,6 +229,47 @@ static int device_release(struct inode *inode, struct file *file)
     return 0;
 }
 
+struct file *file_open(const char *path, int flags, int rights) 
+{
+    struct file *filp = NULL;
+    mm_segment_t oldfs;
+    int err = 0;
+
+    oldfs = get_fs();
+    set_fs(get_ds());
+    filp = filp_open(path, flags, rights);
+    set_fs(oldfs);
+    if (IS_ERR(filp)) {
+        err = PTR_ERR(filp);
+        return NULL;
+    }
+    return filp;
+}
+
+void log_access(const char * filename, int secf,  int cur_uid, int secu, int wo, int rw){
+    char data[LOG_LEN];
+    char timestr[80];
+    struct timespec curr_tm;
+    getnstimeofday(&curr_tm);
+    
+    sprintf(data, "uid:%d - secu: %d - filepath: %s - secf: %d - r(%d)w(%d)rw(%d) - time(%.2lu:%.2lu:%.2lu:%.6lu)\n", 
+         cur_uid, secu,filename, secf, (!(wo|rw) ? 1: 0), (wo ? 1: 0), (rw ? 1: 0), (curr_tm.tv_sec / 3600) % (24),
+                   (curr_tm.tv_sec / 60) % (60), curr_tm.tv_sec % 60, curr_tm.tv_nsec / 1000);
+    printk(KERN_INFO, "%d\n", data);
+    struct file * handle =  file_open(LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0644);
+    if(handle == NULL){
+        sprintf(data, "cannot open log file");
+        return;
+    }
+    mm_segment_t oldfs;
+    unsigned long long offset =0;
+    oldfs = get_fs();
+    set_fs(get_ds());
+    vfs_write(handle, data, strlen(data), &offset);
+    set_fs(oldfs);
+    filp_close(handle, NULL);
+}
+
 static asmlinkage long my_open(const char __user *filename, int flags, umode_t mode)
 {
     int cur_uid = (int) get_current_user()->uid.val;
@@ -236,29 +284,25 @@ static asmlinkage long my_open(const char __user *filename, int flags, umode_t m
         if(*(ptr++) == '\0')
             break;
     }
+
+    int write_only = flags & O_WRONLY;
+	int read_write = flags & O_RDWR;
 	
     if((cur_u = find_user_entry(cur_uid))!= NULL)
         secu = cur_u->secl;
 
-    if((cur_f = find_file_entry(kfilename))!= NULL)
+    if((cur_f = find_file_entry(kfilename))!= NULL){
         secf = cur_f->secl;
-
-    if(secf){
-    	printk(KERN_INFO "filepath: %s - uid:%d - secu: %d - secf: %d\n", kfilename, cur_uid, secu, secf);
-        printk(KERN_INFO "flags: w(%d) rw(%d)\n", flags & O_WRONLY, flags & O_RDWR);
+        log_access(kfilename, secf, cur_uid,  secu, write_only, read_write );
     }
-    
-    return old_open(filename, flags, mode);
 
     if (secu == secf)
 		return old_open(filename, flags, mode);
     
-    int write_only = flags & O_WRONLY;
-	int read_write = flags & O_RDWR;
-    
     if( secu < secf) {
         if(write_only)
             return old_open(filename, flags, mode);
+        printk(KERN_INFO "read permition denied\n");
         return -1;
     } else {
         if(!(write_only|read_write))
