@@ -87,7 +87,6 @@ void add_user(int uid, int secl)
         entry->secl = secl;
         return;
     }
-    printk(KERN_INFO "allocating for add_user\n");
     entry = (u_entry *)kmalloc(sizeof(u_entry),GFP_KERNEL);
     if (entry == NULL)
     {
@@ -116,7 +115,6 @@ void add_file(char *path, int secl)
         entry->secl = secl;
         return;
     }
-    printk(KERN_INFO "allocating for add_file\n");
     entry = (f_entry *)kmalloc(sizeof(f_entry), GFP_KERNEL);
     if (entry == NULL)
     {
@@ -152,23 +150,19 @@ static ssize_t device_read(struct file *flip, char *buffer, size_t len, loff_t *
     if (cur_user != NULL)
     {
         sprintf(msg, "%susers:", msg);
-
         while (cur_user != NULL)
         {
             sprintf(msg, "%s%d%d:", msg, cur_user->secl, cur_user->uid);
             cur_user = cur_user->next;
         }
-        printk(KERN_INFO "wrote msg users", msg);
     }
     sprintf(msg, "%s\n", msg);
 
     /* Set the msg_ptr to the buffer */
     msg_ptr = msg;
-    printk(KERN_INFO "put to user mamory", msg);
     /* Put data in the buffer */
     while (len-- && *msg_ptr)
         put_user(*(msg_ptr++), buffer++);
-    printk(KERN_INFO "put to user mamory", msg);
     kfree(msg);
     return bytes_read;
 }
@@ -198,7 +192,6 @@ static ssize_t device_write(struct file *flip, const char *buffer, size_t len, l
     {
         int i = 0, j = 0;
         for(; i < len && input_buffer[i] != '\n'; i++);
-        printk(KERN_INFO "allocating for write file name\n");
         char * path = (char *)kmalloc((i-1) * sizeof(char), GFP_KERNEL);
         for(; j < i -2; j++)
             *(path + j) = input_buffer[2 + j];
@@ -250,11 +243,13 @@ static asmlinkage long my_open(const char __user *filename, int flags, umode_t m
     if((cur_f = find_file_entry(kfilename))!= NULL)
         secf = cur_f->secl;
 
-    if(secf)
+    if(secf){
     	printk(KERN_INFO "filepath: %s - uid:%d - secu: %d - secf: %d\n", kfilename, cur_uid, secu, secf);
+        printk(KERN_INFO "flags: w(%d) rw(%d)\n", flags & O_WRONLY, flags & O_RDWR);
+    }
     
     return old_open(filename, flags, mode);
-    
+
     if (secu == secf)
 		return old_open(filename, flags, mode);
     
@@ -323,3 +318,4 @@ static void __exit module_cleanup(void)
 }
 module_init(module_startup);
 module_exit(module_cleanup);
+///home/vahidzee/Desktop/OSProject/test_file
