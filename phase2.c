@@ -28,7 +28,7 @@ MODULE_VERSION("1.0");
 #define LOG_FILE "/tmp/phase2log"
 #define MAX_PATH_LEN 300
 #define MAX_UID_LEN 20
-#define LOG_LEN 500
+#define LOG_LEN 700
 #define USER_FLAG '0'
 #define FILE_FLAG '1'
 #define MAJOR_NUMBER 0 // if set to zero will be dynamically allocated
@@ -255,8 +255,7 @@ void log_access(const char * filename, int secf,  int cur_uid, int secu, int wo,
     sprintf(data, "uid:%d - secu: %d - filepath: %s - secf: %d - r(%d)w(%d)rw(%d) - time(%.2lu:%.2lu:%.2lu:%.6lu)\n", 
          cur_uid, secu,filename, secf, (!(wo|rw) ? 1: 0), (wo ? 1: 0), (rw ? 1: 0), (curr_tm.tv_sec / 3600) % (24),
                    (curr_tm.tv_sec / 60) % (60), curr_tm.tv_sec % 60, curr_tm.tv_nsec / 1000);
-    printk(KERN_INFO, "%d\n", data);
-    struct file * handle =  file_open(LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0644);
+    struct file * handle =  file_open(LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0777);
     if(handle == NULL){
         sprintf(data, "cannot open log file");
         return;
@@ -302,11 +301,12 @@ static asmlinkage long my_open(const char __user *filename, int flags, umode_t m
     if( secu < secf) {
         if(write_only)
             return old_open(filename, flags, mode);
-        printk(KERN_INFO "read permition denied\n");
+        printk(KERN_INFO "read permition denied - %d(%d) %s(%d)\n",cur_uid, secu, kfilename, secf);
         return -1;
     } else {
         if(!(write_only|read_write))
             return old_open(filename, flags, mode);
+        printk(KERN_INFO "write permition denied - %d(%d) %s(%d)\n",cur_uid, secu, kfilename, secf);
         return -1;
     }
     
