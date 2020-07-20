@@ -20,7 +20,7 @@ def add_entery(flag):
             print('invalid security level')
             return
         with open(args.devfile, 'w') as f:
-            f.write(f'{flag}{res}{path}\n')
+            f.write('{}{}{}\n'.format(str(flag),str(res), str(path)))
     return wrapper
 
 def print_list():
@@ -28,14 +28,14 @@ def print_list():
     with open(args.devfile, 'r', errors='ignore') as f:
         result = f.readline()
     names = result[:len(result)-1].split(':')
-    if names and names[0] != 'users':
+    if names and names[0] != 'users' and names[0]:
         print('- files: ')
     for name in names:
         if name:
             if name == 'users':
                 print('- users: ')
                 continue
-            print(f'\t* {name[1:]} - {name[0]}')
+            print('\t* {} - {}'.format(name[1:],name[0]))
 
 commands = {
     'exit': lambda: exit(),

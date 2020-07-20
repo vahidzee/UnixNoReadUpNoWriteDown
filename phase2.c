@@ -16,7 +16,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vahid Zee");
-MODULE_DESCRIPTION("A Simple PID tracker Device Driver");
+MODULE_DESCRIPTION("Open Functionality revised");
 MODULE_VERSION("1.0");
 #define DEVICE_NAME "phase2"
 
@@ -87,7 +87,8 @@ void add_user(int uid, int secl)
         entry->secl = secl;
         return;
     }
-    entry = (u_entry *)kmalloc(GFP_KERNEL, sizeof(u_entry));
+    printk(KERN_INFO "allocating for add_user\n");
+    entry = (u_entry *)kmalloc(sizeof(u_entry),GFP_KERNEL);
     if (entry == NULL)
     {
         printk(KERN_INFO "Unable to allocate user entry");
@@ -115,7 +116,8 @@ void add_file(char *path, int secl)
         entry->secl = secl;
         return;
     }
-    entry = (f_entry *)kmalloc(GFP_KERNEL, sizeof(f_entry));
+    printk(KERN_INFO "allocating for add_file\n");
+    entry = (f_entry *)kmalloc(sizeof(f_entry), GFP_KERNEL);
     if (entry == NULL)
     {
         printk(KERN_INFO "Unable to allocate file entry");
@@ -132,13 +134,13 @@ void add_file(char *path, int secl)
 static ssize_t device_read(struct file *flip, char *buffer, size_t len, loff_t *offset)
 {
     int bytes_read = len;
-    char *msg = (char *)kmalloc(GFP_KERNEL, (MAX_PATH_LEN * files_count + MAX_UID_LEN * users_count) * sizeof(char));
+    char *msg = (char *)kmalloc(((MAX_PATH_LEN * files_count + MAX_UID_LEN * users_count) + 2) * sizeof(char), GFP_KERNEL);
     if (msg == NULL)
     {
         printk(KERN_INFO "Cannot allocate buffer for read buffer driver");
         return 0;
     }
-
+    sprintf(msg, "");
     char *msg_ptr;
     f_entry *cur_file = files;
     u_entry *cur_user = users;
@@ -150,20 +152,23 @@ static ssize_t device_read(struct file *flip, char *buffer, size_t len, loff_t *
     if (cur_user != NULL)
     {
         sprintf(msg, "%susers:", msg);
+
         while (cur_user != NULL)
         {
             sprintf(msg, "%s%d%d:", msg, cur_user->secl, cur_user->uid);
             cur_user = cur_user->next;
         }
+        printk(KERN_INFO "wrote msg users", msg);
     }
     sprintf(msg, "%s\n", msg);
 
     /* Set the msg_ptr to the buffer */
     msg_ptr = msg;
-
+    printk(KERN_INFO "put to user mamory", msg);
     /* Put data in the buffer */
     while (len-- && *msg_ptr)
         put_user(*(msg_ptr++), buffer++);
+    printk(KERN_INFO "put to user mamory", msg);
     kfree(msg);
     return bytes_read;
 }
@@ -193,7 +198,8 @@ static ssize_t device_write(struct file *flip, const char *buffer, size_t len, l
     {
         int i = 0, j = 0;
         for(; i < len && input_buffer[i] != '\n'; i++);
-        char * path = (char *)kmalloc(GFP_KERNEL, (i-1) * sizeof(char));
+        printk(KERN_INFO "allocating for write file name\n");
+        char * path = (char *)kmalloc((i-1) * sizeof(char), GFP_KERNEL);
         for(; j < i -2; j++)
             *(path + j) = input_buffer[2 + j];
         *(path + i - 2) = '\0';
@@ -237,12 +243,17 @@ static asmlinkage long my_open(const char __user *filename, int flags, umode_t m
         if(*(ptr++) == '\0')
             break;
     }
-    printk(KERN_INFO "filepath: %s\n", kfilename);
+	
     if((cur_u = find_user_entry(cur_uid))!= NULL)
         secu = cur_u->secl;
 
     if((cur_f = find_file_entry(kfilename))!= NULL)
         secf = cur_f->secl;
+
+    if(secf)
+    	printk(KERN_INFO "filepath: %s - uid:%d - secu: %d - secf: %d\n", kfilename, cur_uid, secu, secf);
+    
+    return old_open(filename, flags, mode);
     
     if (secu == secf)
 		return old_open(filename, flags, mode);
