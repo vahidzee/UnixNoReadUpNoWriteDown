@@ -13,11 +13,6 @@ int main(int argc, char *argv[])
         perror("could not open file to write");
         return 1;
     }
-
-    if(write(file1, buffer, num) != num){
-        perror("could not write to destination file");
-        return 2;
-    }
-
+    printf("successful\n");
     close(file1);
 }

@@ -13,8 +13,6 @@ int main(int argc, char *argv[])
         perror("could not read or write to the file");
         return 1;
     }
-    while((num=read(file1, buffer, 1024)) > 0){
-        printf("%s", buffer);
-    }
+    printf("successful\n");
     close(file1);
 }
