@@ -7,6 +7,9 @@ To provide the kernel module with the necessary lists of users and files, a simp
 
 In addition, whenever a file present in the `files` list is accessed, access information is logged into `/tmp/phase2log`.
 
+## Requirements
+* Ubuntu (version <= 16.04)
+
 ## Todo
 * Not all file opening procedures pass through `open` syscall, both `openat` and `openat2` syscalls should be overrided as well.
 * Linux Kernel has a generic implementation of common data structures such as linked lists, `files` and `users` linked lists are to be refactored to use the linux's linked lists instead.
